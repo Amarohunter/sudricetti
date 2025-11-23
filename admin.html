@@ -1,204 +1,3 @@
-```html
-<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Agendamento — Declaração de Dízimo 2025</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root{ --gold-600:#c59b14; --gold-700:#b08812; --gold-50:#fff8ec; }
-    body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;}
-  </style>
-</head>
-<body class="bg-gray-50">
-  <div id="root" class="min-h-screen p-6"></div>
-
-  <script type="text/babel">
-  // -----------------
-  // CONFIGURAÇÕES
-  // -----------------
-  // ** INSIRA SUAS CREDENCIAIS FIREBASE AQUI **
-  const firebaseConfig = {
-    apiKey: "INSIRA_AQUI",
-    authDomain: "INSIRA_AQUI",
-    projectId: "INSIRA_AQUI",
-    storageBucket: "INSIRA_AQUI",
-    messagingSenderId: "INSIRA_AQUI",
-    appId: "INSIRA_AQUI"
-  };
-
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-
-  // Admin token via URL (kept for legacy but admin.html uses password)
-  const ADMIN_TOKEN = 'BISPADO2025';
-
-  // --- Horários (igual aos anteriores) ---
-  const DURATION_MINUTES = 30;
-  const SCHEDULE_RULES = [
-    { date: '2025-12-02', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-03', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-04', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-05', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-06', slots: [{ start: '09:00', end: '11:00' }, { start: '14:00', end: '17:00' }] },
-    { date: '2025-12-07', slots: [{ start: '14:00', end: '17:00' }] },
-    { date: '2025-12-09', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-10', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-11', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-12', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-13', slots: [{ start: '14:00', end: '17:00' }] },
-    { date: '2025-12-14', slots: [{ start: '14:00', end: '17:00' }] }
-  ];
-
-  function generateSlots(dateStr, startStr, endStr){
-    const out=[]; let cur=new Date(`${dateStr}T${startStr}:00`); const end=new Date(`${dateStr}T${endStr}:00`);
-    while(cur<end){ const time=cur.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); out.push({id:`${dateStr}-${time.replace(':','')}`,date:dateStr,time}); cur.setMinutes(cur.getMinutes()+DURATION_MINUTES);} return out;
-  }
-
-  const ALL_SLOTS=[]; SCHEDULE_RULES.forEach(r=> r.slots.forEach(s=> ALL_SLOTS.push(...generateSlots(r.date,s.start,s.end))));
-  const SLOTS_BY_DAY = ALL_SLOTS.reduce((a,s)=>{ (a[s.date]||(a[s.date]=[])).push(s); return a; },{});
-
-  // Autocomplete family heads (extracted from PDF)
-  const FAMILY_HEADS = [
-    "Ávila, Henrique Falcão & Larissa Araujo Pereira",
-    "Barbosa, Custodio Salles",
-    "Cardoso, Leonardo Estevão Souza & Cinthia da Costa Silva",
-    "Costa, Maria Eunice",
-    "Dziabas, Cassio De Mattos & Bárbara Silveira Dionizio",
-    "Ferrer Morillo, Rafael Esteban & Adriana del Valle",
-    "Gutierrez Gonzalez, Jordalis Octavio & Malvis Eukaris de",
-    "Leonardo, Valter & Lilian Cristina Machado",
-    "Maria, Fernando Tito & Lucimara Cristina Chinelati",
-    "Migliato, Marco Aurelio Tonissi & Marcia Regina dos Santos",
-    "De Oliveira, Antonio Marcos de & Liliane Maria Leite de",
-    "Pellegrini, Roberto Aparecido & Valeria Ribeiro",
-    "Pereira, Joana de Jesus",
-    "Plaine, José Aparecido & Inia Marilda Petille",
-    "Ramos, Rafael da Silva & Evelin Yumi Yamashiro",
-    "Rodrigues, Marília Aparecida Guete",
-    "Rodrigues, Robson Alves & Meire Valentina Guette",
-    "Rodriguez, Morian Santana & Raísa Daniela Diniz",
-    "Santana, Claudio José",
-    "Santos, Vinicius & Jennyfer Gabriele",
-    "Silva, Erasmo Pereira da & Erika Vieira Alves",
-    "Silva, Gustavo Jesus & Laís Cassiano",
-    "Silva, Lucas Brito da",
-    "Silva, Mara Rúbia Fonseca da",
-    "Silva, Roberta Pellegrini da",
-    "Silva Junior, Humbelino Amaro e & Janiely da Silva",
-    "Siqueira, Adão Aparecido & Maria Vera Beribilli",
-    "Suehara, Douglas Carlos & Giselle Silva Torquato",
-    "Teodoro, Breno Mizael de Medeiros & Amanda Oliveira Messias",
-    "Tiengo, João & Maria Genilce Calazans Ribeiro",
-    "Trebbi, Adriano José & Denise Morais da Silva",
-    "Trebbi, Alexandre José"
-  ];
-
-  function suggestFamilies(q){ if(!q) return []; const s=q.trim().toLowerCase(); return FAMILY_HEADS.filter(f=> f.toLowerCase().includes(s)).slice(0,12); }
-
-  // helpers
-  function formatDateFriendly(dateStr){ const d=new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}); }
-  function validPhone(p){ if(!p) return false; const d=p.replace(/\D/g,''); return /^\d{10,11}$/.test(d); }
-
-  // App
-  function App(){
-    const [user,setUser]=React.useState(null);
-    const [appointments,setAppointments]=React.useState({});
-    const [query,setQuery]=React.useState('');
-    const [suggestions,setSuggestions]=React.useState([]);
-    const [family,setFamily]=React.useState('');
-    const [phone,setPhone]=React.useState('');
-    const [whatsapp,setWhatsapp]=React.useState(true);
-    const [selectedSlot,setSelectedSlot]=React.useState(null);
-    const [step,setStep]=React.useState(1);
-    const [loading,setLoading]=React.useState(true);
-
-    React.useEffect(()=>{ auth.signInAnonymously(); const unsub=auth.onAuthStateChanged(u=> setUser(u)); return ()=> unsub && unsub(); },[]);
-    React.useEffect(()=>{ if(!user) return; const unsub=db.collection('tithing_appointments').onSnapshot(s=>{ const m={}; s.forEach(d=> m[d.id]=d.data()); setAppointments(m); setLoading(false); },err=>{console.error(err); setLoading(false);} ); return ()=> unsub(); },[user]);
-
-    React.useEffect(()=>{ setSuggestions(suggestFamilies(query)); },[query]);
-
-    async function reserve(){ if(!selectedSlot) return alert('Selecione um horário'); if(!family) return alert('Informe o nome da família'); if(!validPhone(phone)) return alert('Telefone inválido');
-      const already = Object.values(appointments).find(a=> a.family?.toLowerCase().trim()===family.toLowerCase().trim());
-      if(already) return alert('Esta família já possui agendamento.');
-      const payload={ family:family.trim(), phone:phone.replace(/\D/g,''), whatsapp:!!whatsapp, slotId:selectedSlot.id, date:selectedSlot.date, time:selectedSlot.time, timestamp:Date.now() };
-      try{ await db.collection('tithing_appointments').doc(selectedSlot.id).set(payload); setAppointments(prev=> ({...prev, [selectedSlot.id]: payload})); setStep(3); }catch(e){ console.error(e); alert('Erro ao salvar.'); }
-    }
-
-    function selectSuggestion(s){ setFamily(s); setQuery(''); setSuggestions([]); }
-
-    function generateQRCode(){ const c=document.getElementById('qrcode'); c.innerHTML=''; new QRCode(c, { text: window.location.href, width:128, height:128 }); }
-
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white p-6 rounded shadow mb-6">
-          <h1 className="text-2xl font-bold" style={{color:'var(--gold-700)'}}>Declaração de Dízimo 2025</h1>
-          <p className="text-sm text-gray-500">Agendamento — página pública</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <section className="bg-white p-6 rounded shadow">
-            <label className="block text-sm mb-1">Procurar nome</label>
-            <input className="w-full p-2 border rounded mb-2" value={query} onChange={e=> setQuery(e.target.value)} placeholder="Digite parte do nome (ex: Sil)" />
-            {suggestions.length>0 && (<div className="border rounded mb-3 p-2">{suggestions.map(s=> (<div key={s} className="p-2 suggestion" onClick={()=> selectSuggestion(s)}>{s}</div>))}</div>)}
-
-            <label className="block text-sm mb-1">Nome selecionado</label>
-            <input className="w-full p-2 border rounded mb-3" value={family} onChange={e=> setFamily(e.target.value)} placeholder="Ou digite manualmente" />
-
-            <label className="block text-sm mb-1">Telefone</label>
-            <input className="w-full p-2 border rounded mb-3" value={phone} onChange={e=> setPhone(e.target.value)} placeholder="(11) 98888-7777" />
-
-            <label className="block text-sm mb-2">Escolha o horário</label>
-            <div className="space-y-3 max-h-56 overflow-auto">
-              {Object.keys(SLOTS_BY_DAY).sort().map(date=> (<div key={date}><div className="font-semibold mb-2">{formatDateFriendly(date)}</div><div className="grid grid-cols-3 gap-2 mb-4">{SLOTS_BY_DAY[date].map(slot=>{ const taken=!!appointments[slot.id]; const sel= selectedSlot?.id===slot.id; return (<button key={slot.id} disabled={taken} onClick={()=> setSelectedSlot(slot)} className={`p-2 rounded text-sm border ${taken? 'bg-red-100 text-red-600': sel? 'bg-yellow-500 text-white':''}`}>{slot.time}</button>) })}</div></div>))}
-            </div>
-
-            <div className="flex gap-2 mt-4"><button onClick={reserve} className="px-4 py-2 rounded" style={{background:'var(--gold-700)', color:'#fff'}}>Confirmar</button><button onClick={()=>{ setFamily(''); setPhone(''); setSelectedSlot(null); setQuery(''); setSuggestions([]); }} className="px-4 py-2 rounded border">Limpar</button></div>
-
-            <div className="mt-4"><div id="qrcode"></div><button onClick={generateQRCode} className="mt-2 text-sm" style={{color:'var(--gold-700)'}}>Gerar QR Code</button></div>
-          </section>
-
-          <aside>
-            <div className="bg-white p-6 rounded shadow mb-4">
-              <h3 className="font-bold">Resumo</h3>
-              <p className="text-sm text-gray-500">Selecionado: {selectedSlot? `${formatDateFriendly(selectedSlot.date)} • ${selectedSlot.time}` : '—'}</p>
-              <p className="text-sm text-gray-500">Família: {family || '—'}</p>
-            </div>
-
-            <div className="bg-white p-6 rounded shadow">
-              <h3 className="font-bold">Ações</h3>
-              <div className="mt-3 flex flex-col gap-2"><a className="text-sm" href="admin.html">Acesso Bispo</a></div>
-            </div>
-          </aside>
-        </div>
-
-        {step===3 && (<div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4"><div className="bg-white p-6 rounded w-full max-w-md text-center"><h2 className="font-bold text-lg">Agendamento confirmado</h2><p className="mt-2">Família {family}</p><p>{selectedSlot?.date} às {selectedSlot?.time}</p><div className="mt-4"><button onClick={()=>{ setStep(1); setFamily(''); setPhone(''); setSelectedSlot(null); }} className="px-4 py-2 rounded" style={{background:'var(--gold-600)', color:'#fff'}}>Fechar</button></div></div></div>)}
-      </div>
-    );
-  }
-
-  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-
-  </script>
-</body>
-</html>
-```
-
----
-
-## Arquivo: `admin.html`
-
-```html
 <!doctype html>
 <html lang="pt-BR">
 <head>
@@ -220,7 +19,7 @@
 
   <script type="text/babel">
   // -----------------
-  // CONFIG: insira suas credenciais FIREBASE e (opcional) GOOGLE_CLIENT_ID
+  // CONFIG: insira suas credenciais FIREBASE
   // -----------------
   const firebaseConfig = {
     apiKey: "INSIRA_AQUI",
@@ -230,9 +29,6 @@
     messagingSenderId: "INSIRA_AQUI",
     appId: "INSIRA_AQUI"
   };
-  // Se quiser integração direta com o Google Calendar via OAuth, insira aqui o client id.
-  // Caso contrário, o painel terá botão que abre o evento pré-preenchido no Google Calendar
-  const GOOGLE_CLIENT_ID = ""; // EX: 1234-abc.apps.googleusercontent.com
 
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
@@ -250,20 +46,18 @@
       if(p === ADMIN_PASSWORD) setOk(true); else { alert('Senha inválida'); }
     },[]);
 
-    React.useEffect(()=>{ if(!ok) return; auth.signInAnonymously(); const unsub=auth.onAuthStateChanged(u=>{}); const unsub2 = db.collection('tithing_appointments').onSnapshot(snap=>{ const m={}; snap.forEach(d=> m[d.id]=d.data()); setAppointments(m); setLoading(false); }); return ()=>{ unsub && unsub(); unsub2 && unsub2(); } },[ok]);
+    React.useEffect(()=>{ if(!ok) return; auth.signInAnonymously(); const unsub2 = db.collection('tithing_appointments').onSnapshot(snap=>{ const m={}; snap.forEach(d=> m[d.id]=d.data()); setAppointments(m); setLoading(false); }); return ()=>{ unsub2 && unsub2(); } },[ok]);
 
     function exportExcel(){ const rows = Object.values(appointments).map(a=>({ Família:a.family, Telefone:a.phone, WhatsApp:a.whatsapp? 'Sim':'Não', Data:a.date, Horário:a.time, Timestamp:new Date(a.timestamp).toLocaleString(), Email: a.email || '' })); const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'agendamentos'); const wbout=XLSX.write(wb,{bookType:'xlsx', type:'array'}); const blob=new Blob([wbout],{type:'application/octet-stream'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`agendamentos_${new Date().toISOString().slice(0,10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
 
     async function remove(id){ if(!confirm('Remover?')) return; await db.collection('tithing_appointments').doc(id).delete(); }
 
-    // Google Calendar event creation link (fallback) — prefill
     function openCalendarPrefill(a){
-      // a: appointment object
-      const start = a.date.replace(/-/g,'') + 'T' + a.time.replace(':','') + '00';
-      // end = +30 minutes
-      const dt = new Date(a.date+'T'+a.time+':00'); dt.setMinutes(dt.getMinutes()+30);
-      const endStr = dt.toISOString().replace(/[-:]/g,'').split('.')[0];
-      const startStr = new Date(a.date+'T'+a.time+':00').toISOString().replace(/[-:]/g,'').split('.')[0];
+      const dtStart = new Date(a.date+'T'+a.time+':00');
+      const dtEnd = new Date(dtStart.getTime() + 30*60000);
+      const toIso = d=> d.toISOString().replace(/[-:]/g,'').split('.')[0];
+      const startStr = toIso(dtStart);
+      const endStr = toIso(dtEnd);
       const text = encodeURIComponent('Entrevista Dízimo - ' + a.family);
       const details = encodeURIComponent('Contato: ' + (a.phone||'') );
       const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${startStr}/${endStr}&details=${details}`;
@@ -302,6 +96,7 @@
               ))}
             </div>
 
+            <div className="mt-6 text-sm text-gray-500">Lista de membros (acesso restrito): <a href="assets/Lista de Membros - dizimo.pdf" target="_blank" rel="noopener">Abrir PDF</a></div>
           </div>
         )}
       </div>

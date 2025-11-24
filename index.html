@@ -10,113 +10,173 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    :root{ --gold-600:#c59b14; --gold-700:#b08812; --gold-50:#fff8ec; }
-    body{font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;}
-    .suggestion { cursor: pointer; padding:0.4rem 0.6rem; border-radius:0.4rem; }
-    .suggestion:hover { background:#f8f8f8; }
+    :root{ --gold-600:#c59b14; --gold-700:#b08812; }
+    body{font-family:Inter, system-ui, sans-serif;}
+    .suggestion{cursor:pointer;padding:6px;border-radius:6px;}
+    .suggestion:hover{background:#f1f1f1;}
   </style>
 </head>
 <body class="bg-gray-50">
-  <div id="root" class="min-h-screen p-6"></div>
+<div id="root" class="min-h-screen p-6"></div>
 
-  <script type="text/babel">
-  const firebaseConfig = {
-    apiKey: "AIzaSyCxaE2_X7w_2P3Afk_8jleDSfEP2sAN_vc",
-    authDomain: "sudricetti.firebaseapp.com",
-    projectId: "sudricetti",
-    storageBucket: "sudricetti.firebasestorage.app",
-    messagingSenderId: "242392710868",
-    appId: "1:242392710868:web:31e5a67340ea409d0f4541",
-    measurementId: "G-BX7922E2QX"
-  };
+<script type="text/babel">
+// Firebase
+const firebaseConfig={
+  apiKey:"AIzaSyCxaE2_X7w_2P3Afk_8jleDSfEP2sAN_vc",
+  authDomain:"sudricetti.firebaseapp.com",
+  projectId:"sudricetti",
+  storageBucket:"sudricetti.firebasestorage.app",
+  messagingSenderId:"242392710868",
+  appId:"1:242392710868:web:31e5a67340ea409d0f4541",
+};
+firebase.initializeApp(firebaseConfig);
+const auth=firebase.auth();
+const db=firebase.firestore();
 
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
+// Slots
+const DURATION=30;
+const RULES=[
+  {date:'2025-12-02',slots:[{start:'19:00',end:'21:30'}]},
+  {date:'2025-12-03',slots:[{start:'19:00',end:'21:30'}]},
+  {date:'2025-12-04',slots:[{start:'19:00',end:'21:30'}]},
+  {date:'2025-12-05',slots:[{start:'19:00',end:'21:30'}]},
+  {date:'2025-12-06',slots:[{start:'09:00',end:'11:00'},{start:'14:00',end:'17:00'}]},
+  {date:'2025-12-07',slots:[{start:'14:00',end:'17:00'}]},
+  {date:'2025-12-09',slots:[{start:'19:00',end:'21:30'}]},
+  {date:'2025-12-10',slots:[{start:'19:00',end:'21:30'}]},
+  {date:'2025-12-11',slots:[{start:'19:00',end:'21:30'}]},
+  {date:'2025-12-12',slots:[{start:'19:00',end:'21:30'}]},
+  {date:'2025-12-13',slots:[{start:'14:00',end:'17:00'}]},
+  {date:'2025-12-14',slots:[{start:'14:00',end:'17:00'}]},
+];
 
-  const ADMIN_TOKEN = 'BISPADO2025';
+function genSlots(date,start,end){
+  const out=[];
+  let cur=new Date(`${date}T${start}:00`);
+  const endDt=new Date(`${date}T${end}:00`);
+  while(cur<endDt){
+    const time=cur.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    out.push({id:`${date}-${time.replace(':','')}`,date,time});
+    cur.setMinutes(cur.getMinutes()+DURATION);
+  }
+  return out;
+}
 
-  const DURATION_MINUTES = 30;
-  const SCHEDULE_RULES = [
-    { date: '2025-12-02', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-03', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-04', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-05', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-06', slots: [{ start: '09:00', end: '11:00' }, { start: '14:00', end: '17:00' }] },
-    { date: '2025-12-07', slots: [{ start: '14:00', end: '17:00' }] },
-    { date: '2025-12-09', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-10', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-11', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-12', slots: [{ start: '19:00', end: '21:30' }] },
-    { date: '2025-12-13', slots: [{ start: '14:00', end: '17:00' }] },
-    { date: '2025-12-14', slots: [{ start: '14:00', end: '17:00' }] }
-  ];
+const ALL=[];
+RULES.forEach(r=>r.slots.forEach(s=>ALL.push(...genSlots(r.date,s.start,s.end))));
+const BYDAY=ALL.reduce((a,s)=>{(a[s.date]||(a[s.date]=[])).push(s);return a;},{});
 
-  function generateSlots(dateStr, startStr, endStr){
-    const out=[]; let cur=new Date(`${dateStr}T${startStr}:00`); const end=new Date(`${dateStr}T${endStr}:00`);
-    while(cur<end){ const time=cur.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); out.push({id:`${dateStr}-${time.replace(':','')}`,date:dateStr,time}); cur.setMinutes(cur.getMinutes()+DURATION_MINUTES);} return out;
+// Names
+const FAMILY_HEADS=["Ávila, Henrique Falcão & Larissa Araujo Pereira","Barbosa, Custodio Salles","Cardoso, Leonardo Estevão Souza & Cinthia da Costa Silva","Costa, Maria Eunice","Dziabas, Cassio De Mattos & Bárbara Silveira Dionizio","Ferrer Morillo, Rafael Esteban & Adriana del Valle","Gutierrez Gonzalez, Jordalis Octavio & Malvis Eukaris de","Leonardo, Valter & Lilian Cristina Machado","Maria, Fernando Tito & Lucimara Cristina Chinelati","Migliato, Marco Aurelio Tonissi & Marcia Regina dos Santos","De Oliveira, Antonio Marcos de & Liliane Maria Leite de","Pellegrini, Roberto Aparecido & Valeria Ribeiro","Pereira, Joana de Jesus","Plaine, José Aparecido & Inia Marilda Petille","Ramos, Rafael da Silva & Evelin Yumi Yamashiro","Rodrigues, Marília Aparecida Guete","Rodrigues, Robson Alves & Meire Valentina Guette","Rodriguez, Morian Santana & Raísa Daniela Diniz","Santana, Claudio José","Santos, Vinicius & Jennyfer Gabriele","Silva, Erasmo Pereira da & Erika Vieira Alves","Silva, Gustavo Jesus & Laís Cassiano","Silva, Lucas Brito da","Silva, Mara Rúbia Fonseca da","Silva, Roberta Pellegrini da","Silva Junior, Humbelino Amaro e & Janiely da Silva","Siqueira, Adão Aparecido & Maria Vera Beribilli","Suehara, Douglas Carlos & Giselle Silva Torquato","Teodoro, Breno Mizael de Medeiros & Amanda Oliveira Messias","Tiengo, João & Maria Genilce Calazans Ribeiro","Trebbi, Adriano José & Denise Morais da Silva","Trebbi, Alexandre José"];
+
+function suggest(q){if(!q)return[];const s=q.toLowerCase().trim();return FAMILY_HEADS.filter(f=>f.toLowerCase().includes(s)).slice(0,12);}  
+function validPhone(p){const d=p.replace(/\D/g,'');return /^\d{10,11}$/.test(d);}  
+function fmt(d){return new Date(d+"T12:00:00").toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});} 
+
+// App
+function App(){
+  const[user,setUser]=React.useState(null);
+  const[appointments,setA]=React.useState({});
+  const[query,setQuery]=React.useState('');
+  const[suggestions,setSug]=React.useState([]);
+  const[family,setFamily]=React.useState('');
+  const[phone,setPhone]=React.useState('');
+  const[selected,setSel]=React.useState(null);
+  const[step,setStep]=React.useState(1);
+
+  React.useEffect(()=>{auth.signInAnonymously();auth.onAuthStateChanged(u=>setUser(u));},[]);
+  React.useEffect(()=>{if(!user)return;return db.collection('tithing_appointments').onSnapshot(s=>{const m={};s.forEach(d=>m[d.id]=d.data());setA(m);});},[user]);
+
+  React.useEffect(()=>{setSug(suggest(query));},[query]);
+
+  async function reserve(){
+    if(!selected) return alert('Selecione um horário');
+    if(!family.trim()) return alert('Informe a família');
+    if(!validPhone(phone)) return alert('Telefone inválido');
+
+    if(Object.values(appointments).some(a=>a.family?.toLowerCase().trim()===family.toLowerCase().trim()))
+      return alert('Esta família já possui agendamento.');
+
+    const payload={family:family.trim(),phone:phone.replace(/\D/g,''),slotId:selected.id,date:selected.date,time:selected.time,timestamp:Date.now()};
+    await db.collection('tithing_appointments').doc(selected.id).set(payload);
+    setA(p=>({...p,[selected.id]:payload}));
+    setStep(3);
   }
 
-  const ALL_SLOTS=[]; SCHEDULE_RULES.forEach(r=> r.slots.forEach(s=> ALL_SLOTS.push(...generateSlots(r.date,s.start,s.end))));
-  const SLOTS_BY_DAY = ALL_SLOTS.reduce((a,s)=>{ (a[s.date]||(a[s.date]=[])).push(s); return a; },{});
+  const ready = family.trim() && validPhone(phone) && selected;
 
-  const FAMILY_HEADS = [
-    "Ávila, Henrique Falcão & Larissa Araujo Pereira",
-    "Barbosa, Custodio Salles",
-    "Cardoso, Leonardo Estevão Souza & Cinthia da Costa Silva",
-    "Costa, Maria Eunice",
-    "Dziabas, Cassio De Mattos & Bárbara Silveira Dionizio",
-    "Ferrer Morillo, Rafael Esteban & Adriana del Valle",
-    "Gutierrez Gonzalez, Jordalis Octavio & Malvis Eukaris de",
-    "Leonardo, Valter & Lilian Cristina Machado",
-    "Maria, Fernando Tito & Lucimara Cristina Chinelati",
-    "Migliato, Marco Aurelio Tonissi & Marcia Regina dos Santos",
-    "De Oliveira, Antonio Marcos de & Liliane Maria Leite de",
-    "Pellegrini, Roberto Aparecido & Valeria Ribeiro",
-    "Pereira, Joana de Jesus",
-    "Plaine, José Aparecido & Inia Marilda Petille",
-    "Ramos, Rafael da Silva & Evelin Yumi Yamashiro",
-    "Rodrigues, Marília Aparecida Guete",
-    "Rodrigues, Robson Alves & Meire Valentina Guette",
-    "Rodriguez, Morian Santana & Raísa Daniela Diniz",
-    "Santana, Claudio José",
-    "Santos, Vinicius & Jennyfer Gabriele",
-    "Silva, Erasmo Pereira da & Erika Vieira Alves",
-    "Silva, Gustavo Jesus & Laís Cassiano",
-    "Silva, Lucas Brito da",
-    "Silva, Mara Rúbia Fonseca da",
-    "Silva, Roberta Pellegrini da",
-    "Silva Junior, Humbelino Amaro e & Janiely da Silva",
-    "Siqueira, Adão Aparecido & Maria Vera Beribilli",
-    "Suehara, Douglas Carlos & Giselle Silva Torquato",
-    "Teodoro, Breno Mizael de Medeiros & Amanda Oliveira Messias",
-    "Tiengo, João & Maria Genilce Calazans Ribeiro",
-    "Trebbi, Adriano José & Denise Morais da Silva",
-    "Trebbi, Alexandre José"
-  ];
+  return(
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-white p-6 rounded shadow mb-6">
+        <h1 className="text-2xl font-bold" style={{color:'var(--gold-700)'}}>Declaração de Dízimo 2025</h1>
+        <p className="text-sm text-gray-500">Agendamento</p>
+      </div>
 
-  function suggestFamilies(q){ if(!q) return []; const s=q.trim().toLowerCase(); return FAMILY_HEADS.filter(f=> f.toLowerCase().includes(s)).slice(0,12); }
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section className="bg-white p-6 rounded shadow">
+          <label className="text-sm">Procurar nome</label>
+          <input className="w-full p-2 border rounded mb-2" value={query} onChange={e=>setQuery(e.target.value)} />
+          {suggestions.length>0 && <div className="border rounded p-2 mb-3">{suggestions.map(s=>(<div key={s} className="suggestion" onClick={()=>{setFamily(s);setQuery('');setSug([]);}}>{s}</div>))}</div>}
 
-  function formatDateFriendly(dateStr){ const d=new Date(dateStr+'T12:00:00'); return d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}); }
-  function validPhone(p){ if(!p) return false; const d=p.replace(/\D/g,''); return /^\d{10,11}$/.test(d); }
+          <label className="text-sm">Nome selecionado</label>
+          <input className="w-full p-2 border rounded mb-3" value={family} onChange={e=>setFamily(e.target.value)} />
 
-  function App(){
-    const [user,setUser]=React.useState(null);
-    const [appointments,setAppointments]=React.useState({});
-    const [query,setQuery]=React.useState('');
-    const [suggestions,setSuggestions]=React.useState([]);
-    const [family,setFamily]=React.useState('');
-    const [phone,setPhone]=React.useState('');
-    const [whatsapp,setWhatsapp]=React.useState(true);
-    const [selectedSlot,setSelectedSlot]=React.useState(null);
-    const [step,setStep]=React.useState(1);
-    const [loading,setLoading]=React.useState(true);
+          <label className="text-sm">Telefone</label>
+          <input className="w-full p-2 border rounded mb-3" value={phone} onChange={e=>setPhone(e.target.value)} />
 
-    React.useEffect(()=>{ auth.signInAnonymously(); const unsub=auth.onAuthStateChanged(u=> setUser(u)); return ()=> unsub && unsub(); },[]);
-    React.useEffect(()=>{ if(!user) return; const unsub=db.collection('tithing_appointments').onSnapshot(s=>{ const m={}; s.forEach(d=> m[d.id]=d.data()); setAppointments(m); setLoading(false); },err=>{console.error(err); setLoading(false);} ); return ()=> unsub(); },[user]);
+          <label className="text-sm mb-2">Escolha o horário</label>
+          <div className="space-y-3 max-h-56 overflow-auto">
+            {Object.keys(BYDAY).sort().map(date=>(
+              <div key={date}>
+                <div className="font-semibold mb-1">{fmt(date)}</div>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {BYDAY[date].map(slot=>{
+                    const taken=!!appointments[slot.id];
+                    const sel=selected?.id===slot.id;
+                    return(
+                      <button key={slot.id} disabled={taken} onClick={()=>setSel(slot)}
+                        className={`p-2 rounded text-sm border ${taken?'bg-red-100 text-red-600':sel?'bg-yellow-500 text-white':''}`}>{slot.time}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
 
-    React.useEffect(()=>{ setSuggestions(suggestFamilies(query)); },[
+          <button disabled={!ready} onClick={reserve}
+            className={`mt-4 px-4 py-2 rounded text-white ${ready?'':'bg-gray-400 cursor-not-allowed'}`}
+            style={ready?{background:'var(--gold-700)'}:{}}>
+            Confirmar
+          </button>
+        </section>
+
+        <aside>
+          <div className="bg-white p-6 rounded shadow mb-4">
+            <h3 className="font-bold">Resumo</h3>
+            <p className="text-sm">Selecionado: {selected?`${fmt(selected.date)} • ${selected.time}`:'—'}</p>
+            <p className="text-sm">Família: {family||'—'}</p>
+          </div>
+        </aside>
+      </div>
+
+      {step===3 && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4">
+          <div className="bg-white p-6 rounded text-center max-w-md w-full">
+            <h2 className="font-bold text-lg">Agendamento finalizado</h2>
+            <p className="mt-2">Família {family}</p>
+            <p>{selected?.date} às {selected?.time}</p>
+            <button className="mt-4 px-4 py-2 rounded text-white" style={{background:'var(--gold-600)'}} onClick={()=>{setStep(1);setFamily('');setPhone('');setSel(null);}}>Fechar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
